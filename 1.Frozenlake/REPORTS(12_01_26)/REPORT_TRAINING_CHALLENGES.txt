@@ -1,0 +1,66 @@
+FROZEN LAKE: AGENT TRAINING & CHALLENGES REPORT
+===============================================
+
+1. OVERVIEW
+-----------
+This report details the efforts to train and integrate various agents into the FrozenLake environment, the specific methodologies employed, and the significant technical barriers encountered during the process.
+
+2. AGENTS EVALUATED
+-------------------
+I integrated and tested the following agent configurations:
+
+(A) THE MOCK AGENT
+    - Description: A simulated agent used to verify the pipeline's integrity.
+    - Behavior: Heuristic/Random (typically moves "RIGHT").
+    - Status: SUCCESS. Verified that the environment, parser, and scoring rubric work correctly.
+
+(B) GEMINI AGENT (Google DeepMind)      
+    - Description: Integration with Google's Generative AI API.
+    - Models Attempted:
+        1. gemini-1.5-flash: Failed (404 Not Found - Region/Version mismatch).
+        2. gemini-pro: Failed (404 Not Found - Deprecated).
+        3. gemini-2.0-flash: Successfully connected but encountered runtime issues.
+    - Status: INTEGRATED BUT BLOCKED. The code works, but external API limits prevent training.
+
+(C) QWEN AGENT (Local/HuggingFace)
+    - Description: A 7B-parameter local model used for zero-shot reasoning.
+    - Status: FAILED TO SOLVE. The model struggled with "blind" spatial reasoning, frequently falling into holes due to a lack of visual context or memory of the grid layout.
+
+3. METHODOLOGY: HOW WE TRAIN
+----------------------------
+I implemented a loop designed for "In-Context Learning" (ICL) rather than weight updates (BoN/PPO), as we are interacting with black-box APIs.
+
+Step 1: The Loop
+The `train_loop.py` script runs an episode where the agent receives the current observation and history.
+
+Step 2: Generation & Parsing
+The agent generates a response. The system parses the `<action>` tag.
+    - If valid: The move is executed.
+    - If invalid: Feedback is sent to the agent ("Invalid format").
+
+Step 3: Feedback (The "Training")
+Unlike traditional RL which updates weights, we update the PROMPT.
+    - Successful trajectories (Wins) are captured.
+    - These successful examples are appended to the System Prompt for future episodes ("Few-Shotting").
+    - This allows the agent to "learn" from its own history without modifying the underlying model.
+
+4. CHALLENGES & PROBLEMS FACED
+------------------------------
+We encountered two major categories of failure:
+
+(A) EXTERNAL API LIMITATIONS (The "Gemini Problem")
+    - Issue: Rate Limiting (Error 429).
+    - Detail: The Google Gemini Free Tier is extremely restrictive (approx. 15 requests per minute). Since a single episode requires multiple steps (reasoning + action), a single run exhausts the quota immediately.
+    - Result: The agent falls back to a default "RIGHT" action when the API rejects the request, leading to imminent failure (hitting a wall or hole).
+    - Mitigation Attempted: I added `time.sleep(10)` between episodes, but this made data collection prohibitively slow.
+
+(B) REASONING DEFICITS (The "Local Model Problem")
+    - Issue: Spatial Blindness.
+    - Detail: Text-only models struggle to maintain a 2D mental map of the grid (4x4) based solely on text coordinates. They treated "DOWN" as a semantic word rather than a vector in a coordinate system.
+    - Result: Models like Qwen-7B essentially walked randomly, unable to plan paths around obstacles.
+
+5. CONCLUSION
+-------------
+The infrastructure for training is sound. However, I am currently bottle-necked by:
+1. API Constraints: The free-tier limits are making it tough to get any real momentum during training loops.
+2. Spatial Reasoning: The models seem to lose their way on the grid fairly easily. I'm stuck between needing more powerful models or figuring out a better way to help them "visualize" the map, perhaps through a more structured memory scratchpad.

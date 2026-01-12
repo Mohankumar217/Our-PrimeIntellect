@@ -1,0 +1,56 @@
+FROZEN LAKE ENVIRONMENT: SYSTEM ARCHITECTURE
+==========================================
+
+The system follows a modular "Layered Architecture" designed to decouple the simulation physics from the language processing logic. This separation of concerns allows us to swap out the underlying model or the environment mechanics without rewriting the entire codebase.
+
+1. THE PHYSICS LAYER ("The World")
+----------------------------------
+File: FrozenLake/frozen_lake_world.py
+Class: FrozenLakeWorld
+
+This layer handles the raw "Ground Truth" of the simulation. It is the absolute authority on the game state.
+    - State Management: It maintains the grid layout (SFFF...), the Agent's exact coordinate (row, col), and the game status (terminated/active).
+    - Movement Logic: It calculates the implementation of moves. For example, it determines that a "RIGHT" move from (0,0) results in (0,1).
+    - Collision & Event Detection: It checks every move against the map boundaries to prevent illegal moves and detects interactions with special tiles (HOLES for failure, GOAL for success).
+
+2. THE INTERFACE LAYER ("The Wrapper")
+--------------------------------------
+File: frozenlake_pi/wrapper/frozenlake.py
+
+This layer acts as the "Translator" or "Bridge" between the raw Physics Layer and the text-based LLM.
+    - XMLParser: This component is responsible for extracting the intent from the LLM's verbose output. It scans for the specific tags (e.g., <action>...</action>) and extracts the command within.
+    - Feedback Generator: This component converts the raw numerical state from the Physics layer into a human-readable string. Instead of returning "State: 4", it returns "You moved RIGHT. You are on a safe frozen tile at (0,1)."
+
+3. THE AGENT LAYER ("The Brain")
+--------------------------------
+File: frozenlake_pi/agent/
+
+This layer defines the entity playing the game. It is designed to be agnostic to the underlying model provider.
+    - Base Abstraction: Defines the `generate(prompt)` method that all agents must implement.
+    - MockLLMAgent: A random/heuristic agent used for testing the pipeline mechanics without needing a GPU or API key.
+    - Model Wrappers (Qwen/Gemini/HF): Specific implementations that connect the local agent interface to external inference engines, handling API calls or local tensor operations.
+
+4. THE VERIFICATION LAYER ("The Judge")
+---------------------------------------
+File: frozenlake_pi/verifier/
+
+This layer is responsible for the objective evaluation of an agent's performance. It is decoupled from the environment to allow for complex, multi-factor scoring.
+    - Outcome Verifier: A binary check that awards +1.0 for reaching the goal and -1.0 for falling in a hole.
+    - Efficiency Verifier: A secondary metric that calculates a bonus based on the number of steps taken, encouraging the agent to find the shortest path.
+    - Rubric: The central aggregator that combines the outcome and efficiency scores into a final report card for the episode.
+
+DATA FLOW DIAGRAM (CONCEPTUAL)
+------------------------------
+[ LLM (Text Input/Output) ]
+          ^
+          | (Text Observations & Actions)
+          v
+[ WRAPPER (Translation Layer) ]
+          ^
+          | (Coordinates & Grid Data)
+          v
+[ PHYSICS (Simulation Engine) ]
+          ^
+          | (Event Logs)
+          v
+[ VERIFIER (Scoring System) ]

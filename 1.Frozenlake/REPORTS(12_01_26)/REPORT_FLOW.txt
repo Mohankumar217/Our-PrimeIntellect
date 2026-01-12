@@ -1,0 +1,55 @@
+FROZEN LAKE ENVIRONMENT: EXECUTION FLOW
+=========================================
+
+This document outlines the step-by-step lifecycle of a single interaction loop (Episode) between the System and the Agent. This flow repeats until the agent either wins, loses, or runs out of time.
+
+PHASE 1: INITIALIZATION
+-----------------------
+(1) Bootstrap: The `load_environment()` function is called to spin up the system.
+(2) World Generation: The `FrozenLakeWorld` class initializes the internal grid map (defaulting to the standard 4x4 layout).
+(3) Reset: The agent is placed at the starting coordinate (0,0).
+(4) Initial Observation: The Wrapper generates the first text message for the agent: "Game started. Good luck! You are at (0,0)."
+
+PHASE 2: THE INTERACTION LOOP
+-----------------------------
+This loop continues while `terminated` is false.
+
+Step 1: Prompt Construction
+The System constructs a full prompt for the LLM. This includes:
+    - Identity: "You are a navigation agent..."
+    - History: Previous actions and results.
+    - Current Observation: "You are at (0,0). To your Right is Frozen..."
+    - Task: "Output your next move in <action> tags."
+
+Step 2: Agent Thinking (Generation)
+The LLM receives the prompt and generates a response. Ideally, this includes a Chain-of-Thought followed by the action:
+    Response: "Thought: I need to avoid holes. Down looks safe. I will move <action>DOWN</action>."
+
+Step 3: Parsing
+The `XMLParser` scans the agent's response string.
+    - Success: It finds "DOWN" inside the tags.
+    - Failure: If tags are missing, it generates an error message ("Invalid format") and skips the physics step, asking the agent to try again.
+
+Step 4: Physics Update
+The `FrozenLakeWorld.step("DOWN")` method is executed.
+    - New Coordinate: The system calculates the new position (1,0).
+    - Tile Check: It checks the terrain type at (1,0). It is 'F' (Frozen/Safe).
+    - Status Update: The internal state is updated.
+
+Step 5: Feedback Generation
+The Wrapper translates the physical result into text:
+    - Message: "You moved DOWN. Current tile: F. Safe."
+
+Step 6: Loop Continuation
+The new observation is appended to the session history, and the flow returns to Step 1.
+
+PHASE 3: TERMINATION & SCORING
+------------------------------
+The loop breaks when the agent hits a 'H' (Hole), 'G' (Goal), or exceeds the 'Max Steps' limit.
+
+(1) Final Event: The physics engine flags `terminated = True`.
+(2) Evaluation: The `Rubric` class examines the entire episode history.
+    - Did it reach the goal? (yes/no)
+    - How many steps did it take?
+(3) Scoring: A final numeric score (e.g., 0.8) is calculated relative to the optimal path.
+(4) Reporting: The system returns the Score and the detailed Log for analysis.
