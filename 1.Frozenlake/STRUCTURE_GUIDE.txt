@@ -3,50 +3,50 @@ PROJECT STRUCTURE & GUIDE
 
 1. CURRENT PROJECT STRUCTURE
 ----------------------------
-The following tree represents the actual state of the 1.Frozenlake codebase as of Jan 12, 2026.
+The following tree represents the actual state of the 1.Frozenlake codebase as of Jan 23, 2026.
 
 1.Frozenlake/
 ├── agent/                       # AGENT IMPLEMENTATIONS
+│   ├── updated/                 # New/Refactored agent code
 │   ├── gemini_agent.py          # Google Gemini API wrapper
-│   ├── hf_agent.py              # Generic Hugging Face model wrapper
-│   ├── list_models.py           # Utility to listed available models
 │   ├── mock_llm.py              # Random/Heuristic agent for testing
 │   ├── qwen_agent.py            # Qwen-specific local wrapper
 │   └── train_loop.py            # Main execution loop (Episode runner)
 │
-├── env/                         # PHYSICS ENGINE
+├── World/                       # PHYSICS ENGINE (formerly env/)
 │   └── frozenlake_world.py      # Core simulation logic (Grid, Movement, Rules)
 │
 ├── verifier/                    # SCORING SYSTEM
 │   ├── __init__.py              # Package initialization
-│   ├── efficiency.py            # Step-count efficienty scorer
+│   ├── efficiency.py            # Step-count efficiency scorer
 │   └── outcome.py               # Win/Loss verifier
 │
 ├── wrapper/                     # LLM INTERFACE
-│   └── frozenlake.py            # Text translation layer (Observer, Parser)
+│   ├── frozenlake.py            # Text translation layer (Observer, Parser)
+│   └── frozenlake_updated.py    # Updated translation layer
 │
-├── REPORTS(12_01_26)/           # GENERATED REPORTS
-│   ├── REPORT_ARCHITECTURE.txt  # System design document
-│   ├── REPORT_FLOW.txt          # Execution lifecycle document
-│   ├── REPORT_SUMMARY.txt       # Project status summary
-│   └── REPORT_TRAINING_CHALLENGES.txt # Training logs and issues
+├── REPORTS(12_01_26)/           # GENERATED REPORTS (Jan 12)
+├── REPORTS(18_01_26)/           # GENERATED REPORTS (Jan 18)
+├── REPORTS(21_01_26)/           # GENERATED REPORTS (Jan 21)
 │
-├── COMPARISON_REPORT.txt        # Previous agent comparison data
 ├── STRUCTURE_GUIDE.txt          # This file
-├── PROJECT_STATUS.txt           # Detailed status log
 ├── README.md                    # Project documentation
-└── pyproject.toml               # Python package configuration
+├── pyproject.toml               # Python package configuration
+├── .env                         # Environment variables (API keys)
+├── download_qwen.py             # Script to download Qwen model
+├── frozenlake_presentation.tex  # Presentation source
+└── memory.json                  # Agent memory/log
 
 2. MODULE DESCRIPTIONS
 ----------------------
-- env/: Contains the "Ground Truth". It knows where the holes are but doesn't speak English.
-- wrapper/: The Translator. Converts the Env's grid state into natural language for the Agent, and parses the Agent's XML output back into game actions.
-- agent/: The Player. Can be a Mock (random) or a Real LLM (Gemini/Qwen). It simply takes text in and outputs text.
+- World/: Contains the "Ground Truth". It knows where the holes are but doesn't speak English.
+- wrapper/: The Translator. Converts the World's grid state into natural language for the Agent, and parses the Agent's XML output back into game actions.
+- agent/: The Player. Can be a Mock (random), a Real LLM (Gemini/Qwen), or updated implementations. It simply takes text in and outputs text.
 - verifier/: The Judge. Independent logic to score performance based on the history of the episode.
 
 3. ARCHITECTURAL STANDARD
 -------------------------
 This project follows the "Prime-Intellect Standard" for LLM Evals:
-1. Separation of Concerns: Physics (Env) != Interface (Wrapper) != Logic (Agent).
+1. Separation of Concerns: Physics (World) != Interface (Wrapper) != Logic (Agent).
 2. Statelessness: The Wrapper does not hold state; it only translates.
 3. Parsability: Strict input/output formats (XML) to prevent hallucination issues.

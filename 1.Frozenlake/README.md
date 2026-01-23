@@ -4,7 +4,24 @@ A custom, robust evaluation (eval) environment designed to test the spatial reas
 
 ---
 
-## 1. Rules of the Game
+## 1. Project Structure & Architecture
+
+This project follows the **"Prime-Intellect Standard"** for LLM Evals, emphasizing strict separation of concerns to ensure fair and rigorous testing.
+
+### The "Prime-Intellect Standard"
+1.  **Separation of Concerns**: Physics (`World`) != Interface (`wrapper`) != Logic (`agent`).
+2.  **Statelessness**: The Wrapper does not hold state; it only translates.
+3.  **Parsability**: Strict input/output formats (XML) to prevent hallucination issues.
+
+### Key Modules
+*   **`World/`** (formerly `env/`): The **Physics Engine**. It contains the "Ground Truth" state of the grid, rules of movement, and collision logic. It does not handle text.
+*   **`wrapper/`**: The **Translator**. It converts the `World`'s raw state into natural language observations for the agent and parses the agent's XML actions back into game commands.
+*   **`agent/`**: The **Player**. Implementations of agents, ranging from random heuristics (`mock_llm.py`) to real LLM wrappers (`gemini_agent.py`, `qwen_agent.py`).
+*   **`verifier/`**: The **Judge**. Independent logic that scores performance based on efficiency, safety, and rule adherence.
+
+---
+
+## 2. Rules of the Game
 The "Frozen Lake" is a classic grid-world puzzle. The rules are simple but unforgiving:
 
 - **The Grid**: A 4x4 map of tiles.
@@ -24,7 +41,7 @@ The "Frozen Lake" is a classic grid-world puzzle. The rules are simple but unfor
 
 ---
 
-## 2. How Our Agents See the Game
+## 3. How Our Agents See the Game
 Unlike human players who see a 2D visual grid, our LLM agents interact with the world purely through **Text**.
 
 ### The Observation (Input to Agent)
@@ -52,8 +69,8 @@ Thought: I need to move towards the center. The right path looks clear.
 
 ---
 
-## 3. What This Environment Does
-This codebase (`frozenlake_pi`) is a bespoke implementation of the environment, built from scratch to avoid dependencies on `Gymnasium` or `OpenAI Gym`. It is specifically engineered for **LLM Evaluation**.
+## 4. What This Environment Does
+This codebase (`1.Frozenlake`) is a bespoke implementation of the environment, built from scratch to avoid dependencies on `Gymnasium` or `OpenAI Gym`. It is specifically engineered for **LLM Evaluation**.
 
 ### Key Features
 *   **Text Wrapper Layer**: A translation layer that converts raw `(x, y)` coordinates into rich semantic descriptions ("You hit a wall").
