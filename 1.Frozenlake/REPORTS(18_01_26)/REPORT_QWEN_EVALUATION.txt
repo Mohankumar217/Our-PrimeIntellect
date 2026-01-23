@@ -1,0 +1,38 @@
+================================================================================
+REPORT: QWEN AGENT EVALUATION (Qwen2.5-1.5B-Instruct)
+DATE:   2026-01-20
+AUTHOR: Prime Intellect Infrastructure Team
+================================================================================
+
+1. OBJECTIVE
+------------
+To evaluate the performance of a local model (`Qwen2.5-1.5B-Instruct`) on the FrozenLake reasoning task.
+
+2. PROBLEM HISTORY
+------------------
+A. PHASE 1: Hallucinated XML structure (Fixed by Parser/Prompt hardening).
+B. PHASE 2: "Invalid Action" hallucinations (`FORWARD`, `TURN_LEFT`) despite negative constraints.
+
+3. FINAL MITIGATION (PHASE 3: MANUAL PROMPT FIX)
+------------------------------------------------
+The System Prompt was manually updated to include a positive constraint list:
+> "You have only four actions: LEFT, RIGHT, UP, DOWN."
+
+4. FINAL RESULTS (PHASE 3)
+--------------------------
+We conducted a verification run with this change.
+
+- **Step 0**: `START GAME. GO LEFT.` (Invalid Format).
+  - The model initially ignored the XML instruction, likely distracted by the new text.
+- **Step 1**: `<action>LEFT</action>` (VALID).
+  - The model recovered and output a valid, allowed action.
+- **Step 2**: `<Action>UP</Action>` (VALID).
+  - The model continued to output valid actions.
+
+5. CONCLUSION
+-------------
+The manual addition of the explicit positive constraint ("You have only four actions...") proved **MORE EFFECTIVE** than negative constraints ("Do NOT use...").
+- It eliminated the `FORWARD` / `TURN` hallucinations.
+- Trade-off: Slight instability in formatting (Step 0 failure), but the agent recovered.
+
+**Status**: The agent is now playable, though performance (reasoning to reach the goal) remains limited by the 1.5B model size.

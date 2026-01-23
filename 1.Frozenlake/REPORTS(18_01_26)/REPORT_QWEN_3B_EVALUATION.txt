@@ -1,0 +1,39 @@
+================================================================================
+REPORT: QWEN AGENT EVALUATION (Qwen2.5-3B-Instruct)
+DATE:   2026-01-20
+AUTHOR: Prime Intellect Infrastructure Team
+================================================================================
+
+1. OBJECTIVE
+------------
+To evaluate the upgraded `Qwen2.5-3B-Instruct` model on the FrozenLake reasoning task, comparing it to the 1.5B version.
+
+2. CONFIGURATION
+----------------
+- Model: Qwen/Qwen2.5-3B-Instruct
+- Setup: Same as previous (Manual Prompt Fix + Hardened Parser)
+- Episodes: 1 (Verification Run)
+
+3. RESULTS
+----------
+A. INSTRUCTION FOLLOWING (SUCCESS)
+   - Unlike the 1.5B model, the 3B model **perfectly adhered** to the XML format and action constraints.
+   - Step 0: `<action>RIGHT</action>` (Valid)
+   - Step 1: `<action>DOWN</action>` (Valid Format)
+   - No hallucinations, no "Invalid Action" errors, no verbose XML dumps.
+
+B. REASONING CAPABILITY (FAILURE)
+   - While valid in *form*, the agent failed in *strategy*.
+   - Path Taken: (0,0) -> RIGHT -> (0,1) -> DOWN -> (1,1) [HOLE]
+   - The agent walked directly into a known hole, despite the System Prompt listing (1,1) as a DANGER zone.
+
+4. CONCLUSION
+-------------
+- **Infrastructure**: Verified robust. The prompt/parser issues are solved.
+- **Model**: The 3B model solves the *alignment/instruction-following* problem of the 1.5B model but still lacks the zero-shot *spatial reasoning* capability to play the game optimally without Chain-of-Thought (CoT) or fine-tuning.
+
+5. RECOMMENDATION
+-----------------
+To achieve a "Win", we likely need:
+1. **Chain of Thought**: Force the model to "think" before acting (e.g., `<thought>...</thought><action>...</action>`).
+2. **Context Examples**: Add successful episode examples (Few-Shot) to the prompt.

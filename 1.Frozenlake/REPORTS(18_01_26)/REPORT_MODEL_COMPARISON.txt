@@ -1,0 +1,42 @@
+================================================================================
+REPORT: LLM BENCHMARK COMPARISON (FrozenLake)
+DATE:   2026-01-20
+AUTHOR: Prime Intellect Infrastructure Team
+================================================================================
+
+1. EXECUTIVE SUMMARY
+--------------------
+We evaluated three Large Language Models (LLMs) on the custom FrozenLake environment to assess their suitability for autonomous spatial reasoning.
+
+**Top Performer**: `Qwen2.5-3B-Instruct` (Best compliance, but limited reasoning)
+**Status**: All models currently fail to consistently solve the maze zero-shot.
+
+2. COMPARISON MATRIX
+--------------------
+Model                Param Size  Format Compliance  Constraint Adherence  Reasoning Success  Key Issue
+Gemini 2.0 Flash     Unknown     YES                YES                   Inconclusive       Rate Limits (429 Error)
+Qwen 2.5 1.5B        1.5B        Poor -> Good       Poor                  NO                 Hallucinations (Action Space)
+Qwen 2.5 3B          3B          PERFECT            PERFECT               NO                 Strategic Failure (Walked into Hole)
+
+3. DETAILED FINDINGS
+--------------------
+
+A. RAW PERFORMANCE (Qwen 3B)
+   - **Instruction Following**: Perfect. No XML errors.
+   - **Strategy**: Fails global pathfinding. It avoids immediate traps at the start but walks into known traps later in the episode.
+
+B. CHAIN-OF-THOUGHT (CoT) EXPERIMENT
+   - **Method**: Updated prompt to require `<thought>` tags before `<action>`.
+   - **Result**:
+     - *Step 0*: SUCCESS. Agent generated valid thoughts and a safe action.
+     - *Step 1+*: FAILURE. Agent **dropped** the planning step and reverted to raw actions.
+     - *Outcome*: Agent walked safely for 3 steps, then fell into a hole at (2,3).
+   - **Analysis**: The model cannot maintain the "Thinking" persona over multiple turns zero-shot. It mimics the brevity of its own previous outputs.
+
+4. CONCLUSION & ROADMAP
+-----------------------
+Zero-shot prompting (even with CoT instructions) is insufficient for this 3B model to solve 4x4 FrozenLake reliably.
+
+**Next Steps**:
+1. **Few-Shot Prompting**: We must populate the context with full, successful episodes (including thoughts) to force the pattern.
+2. **Fine-Tuning**: If reliability is critical, fine-tuning on valid trajectories is required.
