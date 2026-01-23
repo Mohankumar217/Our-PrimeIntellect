@@ -5,7 +5,7 @@ The system follows a modular "Layered Architecture" designed to decouple the sim
 
 1. THE PHYSICS LAYER ("The World")
 ----------------------------------
-File: FrozenLake/frozen_lake_world.py
+File: 1.Frozenlake/frozen_lake_world.py
 Class: FrozenLakeWorld
 
 This layer handles the raw "Ground Truth" of the simulation. It is the absolute authority on the game state.
@@ -15,7 +15,7 @@ This layer handles the raw "Ground Truth" of the simulation. It is the absolute 
 
 2. THE INTERFACE LAYER ("The Wrapper")
 --------------------------------------
-File: frozenlake_pi/wrapper/frozenlake.py
+File: 1.Frozenlake/wrapper/frozenlake.py
 
 This layer acts as the "Translator" or "Bridge" between the raw Physics Layer and the text-based LLM.
     - XMLParser: This component is responsible for extracting the intent from the LLM's verbose output. It scans for the specific tags (e.g., <action>...</action>) and extracts the command within.
@@ -23,7 +23,7 @@ This layer acts as the "Translator" or "Bridge" between the raw Physics Layer an
 
 3. THE AGENT LAYER ("The Brain")
 --------------------------------
-File: frozenlake_pi/agent/
+File: 1.Frozenlake/agent/
 
 This layer defines the entity playing the game. It is designed to be agnostic to the underlying model provider.
     - Base Abstraction: Defines the `generate(prompt)` method that all agents must implement.
@@ -32,7 +32,7 @@ This layer defines the entity playing the game. It is designed to be agnostic to
 
 4. THE VERIFICATION LAYER ("The Judge")
 ---------------------------------------
-File: frozenlake_pi/verifier/
+File: 1.Frozenlake/verifier/
 
 This layer is responsible for the objective evaluation of an agent's performance. It is decoupled from the environment to allow for complex, multi-factor scoring.
     - Outcome Verifier: A binary check that awards +1.0 for reaching the goal and -1.0 for falling in a hole.
