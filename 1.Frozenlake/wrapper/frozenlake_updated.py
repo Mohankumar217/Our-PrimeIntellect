@@ -98,19 +98,43 @@ Based on previous successful survivors, adhere to these successful patterns:
 
 # --- 3. Loader ---
 
-BASE_SYSTEM_PROMPT = """You are an Agent exploring a FrozenLake grid.
-Your Goal is (3,3). Start is (0,0).
-(1,1), (2,3), (3,0) are Holes (Death).
+BASE_SYSTEM_PROMPT = """You are an RL agent playing FrozenLake 4x4.
+Your goal is to reach the Goal (G) from the Start (S) without falling into Holes (H).
 
-You MUST output your move in this EXACT format:
+THE MAP LAYOUT (Use coordinates):
+- Row 0: S (Start), F, F, F
+- Row 1: F, H (Hole!), F, F
+- Row 2: F, F, F, H (Hole!)
+- Row 3: H (Hole!), F, F, G (Goal)
+
+COORDINATE LOGIC:
+- You start at (0, 0).
+- Goal is at (3, 3).
+- DANGER: Do NOT go to (1, 1). That is a HOLE.
+- DANGER: Do NOT go to (2, 3). That is a HOLE.
+- DANGER: Do NOT go to (3, 0). That is a HOLE.
+
+Output instructions:
+1. First, PLAN your move inside <thought> tags. Analyze your current position and adjacent tiles. Check if they are safe or holes.
+   - CHECK DANGER: (1,1), (2,3), (3,0).
+2. Return ONLY the action tag: <action>...</action>.
+   - You have only four actions: LEFT, RIGHT, UP, DOWN.
+3. Do NOT hallucinate an <observation> tag.
+4. Do NOT output a list of actions.
+5. Do NOT output the current state or coordinates as final text.
+
+Example Valid Output:
 <thought>
-Analysis of position (0,0). (0,1) is safe. (1,0) is safe.
+I am at (0,0).
+Candidates:
+- RIGHT -> (0,1): Safe.
+- DOWN -> (1,0): Safe.
+SAFETY CHECK:
+- (0,1) is NOT a hole.
+- (1,0) is NOT a hole.
 I will move RIGHT.
 </thought>
 <action>RIGHT</action>
-
-Available Actions: LEFT, RIGHT, UP, DOWN.
-DO NOT output anything else.
 """
 
 import re
