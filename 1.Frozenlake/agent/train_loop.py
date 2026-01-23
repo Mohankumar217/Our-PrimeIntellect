@@ -1,39 +1,45 @@
 import argparse
 import sys
 import os
+from dotenv import load_dotenv
 
-# Ensure we can import the frozenlake_pi package
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
+load_dotenv()
 
-from frozenlake_pi.wrapper.frozenlake import load_environment
-from frozenlake_pi.agent.mock_llm import MockLLMAgent
-from frozenlake_pi.agent.gemini_agent import GeminiAgent
-from frozenlake_pi.agent.qwen_agent import QwenAgent
-from frozenlake_pi.agent.hf_agent import HuggingFaceAgent
+# Ensure we can import the local packages
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-def run_training_episode(env, agent, verbose=False):
+from wrapper.frozenlake import load_environment
+from agent.mock_llm import MockLLMAgent
+from agent.gemini_agent import GeminiAgent
+from agent.qwen_agent import QwenAgent
+# from agent.hf_agent import HuggingFaceAgent
+
+def run_episode(env, agent, verbose=False):
     """
-    Runs a single episode of interaction between the Environment and the Agent.
+    Runs a single evaluation episode.
     """
     # 1. Reset Environment
     observation = env.reset()
     
     text_history = [] # For verifiers
-    episode_history = [] # For verifiers
+    episode_history = [] # For verifiers: now stores ACTION STRINGS
     
     # Initial Prompt
     current_prompt = env.system_prompt + f"\n\nObservation: {observation['message']}"
+    
+    # TODO: Add prompt summarization here if context gets too long
     
     step_count = 0
     max_steps = 20
     
     final_outcome = "ongoing"
     
-    # Data for training update
+    # Data for agent update (few-shot memory only)
     episode_data = {
         'prompt': current_prompt,
         'response': "",
-        'score': 0.0
+        'score': 0.0,
+        'outcome': "ongoing"
     }
     
     while step_count < max_steps:
@@ -44,11 +50,7 @@ def run_training_episode(env, agent, verbose=False):
         response = agent.generate(current_prompt)
         text_history.append(response)
         
-        # Keep track of the full interaction for the "response" part if we were doing single-turn optimization,
-        # but for multi-turn, we might want the whole conversation.
-        # For the simple update() logic in GeminiAgent, let's just use the last response effectively.
-        # But actually, GeminiAgent.update() expects a 'response'.
-        episode_data['response'] = response # Just capturing the last one for now or we need a better structure suitable for the Agent's update method
+        episode_data['response'] = response 
         
         if verbose:
             print(f"Agent:\n{response.strip()}")
@@ -59,14 +61,16 @@ def run_training_episode(env, agent, verbose=False):
         if not action_text:
             if verbose:
                 print("Invalid XML format!")
-            # Should punish agent, but here we just likely crash or skip
-            # In real training, we'd give negative reward and maybe end episode
+            
             feed_msg = "Invalid format. Use <action>...</action>."
             obs = {"message": feed_msg, "outcome": "ongoing", "terminated": False}
         else:
             # 4. Step Environment
             obs = env.step(action_text)
-            episode_history.append(obs)
+            
+            # CRITICAL: Store action string, NOT raw observation
+            episode_history.append(action_text)
+            
             final_outcome = obs["outcome"]
             
         # 5. Update Prompt
@@ -85,17 +89,19 @@ def run_training_episode(env, agent, verbose=False):
     score = env.rubric.calculate_score(episode_history, final_outcome, text_history, env.parser)
     
     episode_data['score'] = score
+    episode_data['outcome'] = final_outcome
     
     if verbose:
         print(f"\nEpisode Finished. Outcome: {final_outcome}. Score: {score}")
         
     return score, episode_data
 
-def train_loop(agent_type="mock", episodes=10):
+def run_evaluation(agent_type="mock", episodes=10):
     """
-    Simulates a training loop.
+    Runs the LLM evaluation loop.
+    No gradient updates or backprop are performed here.
     """
-    print(f"Starting Training Simulation for {episodes} episodes using {agent_type} agent...")
+    print(f"Starting Evaluation for {episodes} episodes using {agent_type} agent...")
     
     # Load Real Environment
     env = load_environment()
@@ -119,26 +125,34 @@ def train_loop(agent_type="mock", episodes=10):
             print(f"Error initializing QwenAgent: {e}")
             return
     elif agent_type == "hf":
-        try:
-            agent = HuggingFaceAgent()
-        except ValueError as e:
-             print(f"Error initializing HuggingFaceAgent: {e}")
-             print("Please set HF_TOKEN environment variable.")
-             return
+        print("HuggingFaceAgent is currently disabled/missing.")
+        return
+        # try:
+        #     agent = HuggingFaceAgent()
+        # except ValueError as e:
+        #      print(f"Error initializing HuggingFaceAgent: {e}")
+        #      print("Please set HF_TOKEN environment variable.")
+        #      return
     else:
         agent = MockLLMAgent(policy="random")
     
     total_score = 0
-    batch_data = []
+    wins = 0
+    holes = 0
     
     for i in range(episodes):
         print(f"\n=== Episode {i+1} ===")
-        score, episode_info = run_training_episode(env, agent, verbose=True)
-        total_score += score
-        batch_data.append(episode_info)
+        score, episode_info = run_episode(env, agent, verbose=True)
         
-        # --- TRAINING UPDATE STEP ---
-        # Update the agent (e.g. store successful examples for Few-Shot)
+        total_score += score
+        outcome = episode_info['outcome']
+        if outcome == "goal":
+            wins += 1
+        elif outcome == "hole":
+            holes += 1
+        
+        # --- AGENT UPDATE (FEW-SHOT ONLY) ---
+        # This does NOT update model weights. It only updates the agent's context/memory.
         if hasattr(agent, 'update'):
             agent.update([episode_info])
             
@@ -148,13 +162,18 @@ def train_loop(agent_type="mock", episodes=10):
              time.sleep(10)
         
     avg_score = total_score / episodes
-    print(f"\nTraining Complete.")
+    win_rate = wins / episodes
+    hole_rate = holes / episodes
+    
+    print(f"\nEvaluation Complete.")
     print(f"Average Score: {avg_score:.2f}")
+    print(f"Win Rate:      {win_rate:.2%}")
+    print(f"Hole Rate:     {hole_rate:.2%}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--agent", type=str, default="mock", choices=["mock", "gemini", "qwen", "hf"], help="Agent type to train")
+    parser.add_argument("--agent", type=str, default="mock", choices=["mock", "gemini", "qwen", "hf"], help="Agent type to evaluate")
     parser.add_argument("--episodes", type=int, default=5, help="Number of episodes")
     args = parser.parse_args()
     
-    train_loop(agent_type=args.agent, episodes=args.episodes)
+    run_evaluation(agent_type=args.agent, episodes=args.episodes)
