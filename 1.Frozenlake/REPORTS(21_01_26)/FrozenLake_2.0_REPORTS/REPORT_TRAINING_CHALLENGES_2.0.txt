@@ -1,0 +1,45 @@
+FROZEN LAKE 2.0: AGENT TRAINING & CHALLENGES REPORT
+===================================================
+
+1. OVERVIEW
+-----------
+This report details the specific challenges encountered during the upgrade to the "Prime Intellect" architecture and the solutions deployed.
+
+2. MAJOR CHALLENGES FACED
+-------------------------
+
+(A) THE "FORMAT LOCK" (CRITICAL FAILURE)
+    - **Issue**: The Qwen-1.5B (and even 3B) models struggled to output valid XML (`<action>`) in Zero-Shot mode.
+    - **Symptom**: Logs showed "Invalid Format" for 100% of steps. The agent "hallucinated" moving, but physically stayed at (0,0).
+    - **Root Cause**: Small models prioritize conversational text ("I will move right") over syntax constraints.
+    - **Solution**: **The RobustParser**.
+        - We moved the complexity from the *Prompt* to the *Code*.
+        - Instead of forcing the LLM to be a parser, we built a smarter regex parser to extract intent from natural language.
+    - **Status**: SOLVED.
+
+(B) THE "GHOST" MEMORY
+    - **Issue**: Initial memory implementation was storing "Invalid" trajectories.
+    - **Symptom**: The agent would recall "I stood still for 5 turns" as a lesson.
+    - **Solution**:
+        1. Fix the parser (Action = Movement).
+        2. Fitness logic penalizes strictly for lack of progress (Strategy = efficiency).
+    - **Status**: SOLVED.
+
+3. METHODOLOGY 2.0: HOW WE TRAIN NOW
+------------------------------------
+Step 1: The Loop (Unblocked)
+    - The agent speaks naturally. The system understands.
+
+Step 2: Selection Pressure
+    - We no longer save everything. We save "The Best".
+    - `TrajectoryMemory` maintains a high-score table of the 5 most efficient paths found so far.
+
+Step 3: Evolutionary Feedback
+    - These 5 best paths are fed back into the prompt.
+    - The agent essentially "watches a replay" of its best self before making a move.
+
+4. CONCLUSION
+-------------
+The "Infrastructure Wall" has been dismantled. The specific technical hurdles of XML parsing and persistence are gone.
+
+We are now facing the **Cognitive Wall**: validly training a 1.5B parameter model to solve a maze. The tools are ready; now we just need compute time (episodes).

@@ -1,0 +1,48 @@
+FROZEN LAKE ENVIRONMENT 2.0: EXECUTION FLOW (PRIME INTELLECT UPGRADE)
+=====================================================================
+
+This document outlines the lifecycle of the upgraded "Learning Loop," which now includes retrieval, evolution, and persistence.
+
+PHASE 1: INITIALIZATION & RETRIEVAL
+-----------------------------------
+(1) Bootstrap: `train_loop_updated.py` starts.
+(2) Memory Load: `TrajectoryMemory` loads `memory.json` from disk to retrieve the Top-K past episodes.
+(3) Prompt Evolution: The System constructs the dynamic prompt:
+    - Base Instructions: "You are an agent..."
+    - Recalled Memories: "Here are 5 successful paths from the past..."
+(4) World Reset: Agent placed at (0,0).
+
+PHASE 2: THE INTERACTION LOOP (With Robust Parsing)
+---------------------------------------------------
+Step 1: Observation
+The Wrapper generates the state message with *Causal Guidance*:
+    - "You are at (0,0). Goal is at (3,3)."
+
+Step 2: Agent Cognition
+The LLM generates a response, free to think aloud:
+    - Response: "I need to go right. Action: RIGHT"
+
+Step 3: Robust Parsing
+The `RobustParser` scans the text.
+    - It finds the keyword "RIGHT".
+    - It ignores the lack of strict XML tags, preventing "Invalid Format" locks.
+
+Step 4: Feedback Generation
+The Wrapper calculates the strategic outcome:
+    - Action: RIGHT -> New Pos: (0,1).
+    - Feedback: "Analysis: Good. You moved CLOSER to the goal. Safe."
+
+Step 5: Trajectory Capture
+The system records the full triplet: `{Observation, Response, Outcome}` into the current episode buffer.
+
+PHASE 3: PERSISTENCE & EVOLUTION
+--------------------------------
+The loop ends (Goal/Hole/MaxSteps).
+
+(1) Fitness Calculation: Score is computed (Goal=1.0, Efficiency penalty).
+(2) Memory Update: `memory.add_episode(episode)`
+    - The new episode is added.
+    - The memory is re-sorted by fitness.
+    - The worst episodes are dropped (Selection Pressure).
+(3) Persistence: The updated Top-K list is saved to `memory.json`.
+(4) Evolution: The next episode will start with this updated, smarter context.

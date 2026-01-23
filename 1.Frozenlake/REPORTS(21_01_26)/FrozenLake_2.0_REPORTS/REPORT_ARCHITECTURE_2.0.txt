@@ -1,0 +1,51 @@
+FROZEN LAKE ENVIRONMENT 2.0: SYSTEM ARCHITECTURE (PRIME INTELLECT UPGRADE)
+========================================================================
+
+The system has evolved from a stateless RL environment to a "Prime-Intellect" style cognitive architecture. It now features persistent long-term memory, fitness-based selection, and a robust natural language interface.
+
+1. THE PHYSICS LAYER ("The World")
+----------------------------------
+File: 1.Frozenlake/frozen_lake_world.py
+Class: FrozenLakeWorld
+
+This layer remains the immutable ground truth.
+    - State: Grid (4x4), Agent Position, Holes, Goals.
+    - Dynamics: Deterministic movement (LEFT/RIGHT/UP/DOWN).
+    - Status: Unchanged. Stabilized.
+
+2. THE INTERFACE LAYER ("The Wrapper 2.0")
+------------------------------------------
+File: 1.Frozenlake/wrapper/frozenlake_updated.py
+
+This layer has been significantly upgraded to handle "messy" LLM outputs and provide strategic guidance.
+    - RobustParser: Replaced the brittle XMLParser. It uses regex `(LEFT|RIGHT|UP|DOWN)` to extract intent from free-text thought streams, enabling smaller models (1.5B) to operate effectively.
+    - Causal Feedback Generator: Replaced simple descriptive feedback. It now calculates Manhattan Distance deltas and Risk states to provide reasoning aids (e.g., "Good. You moved CLOSER to the goal.").
+
+3. THE COGNITIVE LAYER ("The Memory & Evolution") [NEW]
+-------------------------------------------------------
+File: 1.Frozenlake/agent/updated/trajectory_memory_updated.py
+File: 1.Frozenlake/agent/updated/train_loop_updated.py
+
+This is the core of the Upgrade.
+    - TrajectoryMemory: A JSON-backed persistent storage system.
+        - Persistence: Saves successful episodes to `memory.json`.
+        - Selection Pressure: Uses a fitness function (`score - cost`) to keep only the Top-K strategies.
+    - Evolutionary Prompting: The best trajectories are retrieved from memory and injected into the System Prompt, allowing the agent to "recall" past wins (In-Context Learning).
+
+4. THE AGENT LAYER ("The Policy")
+---------------------------------
+File: 1.Frozenlake/agent/updated/qwen_agent_updated.py
+
+The agent is now "Stateless but Context-Aware".
+    - Model: Qwen2.5-1.5B-Instruct.
+    - Interface: Receives an *Evolved System Prompt* containing the collective wisdom of previous runs.
+
+DATA FLOW DIAGRAM (UPDATED)
+---------------------------
+[ MEMORY (JSON) ] -> (Inject Top-K) -> [ SYSTEM PROMPT ]
+      ^                                      |
+      | (Save Success)                       v
+[ TRAIN LOOP ] <----> [ AGENT (LLM) ] <-> [ WRAPPER (RobustParser) ]
+      |                                      |
+      v                                      v
+[ VERIFIER ] <----------------------- [ PHYSICS WORLD ]
