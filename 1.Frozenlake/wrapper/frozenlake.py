@@ -2,12 +2,13 @@ import re
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 try:
-    from ..env.frozenlake_world import FrozenLakeWorld
-    from ..verifier import reached_goal, fell_in_hole, step_efficiency
+    from World.frozenlake_world import FrozenLakeWorld
+    from verifier import reached_goal, fell_in_hole, step_efficiency
 except ImportError:
-    # Fallback for testing/standalone execution
+    # Fallback or re-raise explanation
     import sys
     import os
+    pass
 # --- 1. System Prompt ---
 
 DEFAULT_SYSTEM_PROMPT = """You are an RL agent playing FrozenLake 4x4.
@@ -26,8 +27,26 @@ COORDINATE LOGIC:
 - DANGER: Do NOT go to (2, 3). That is a HOLE.
 - DANGER: Do NOT go to (3, 0). That is a HOLE.
 
-Output your action in XML format: <action>LEFT</action>, <action>RIGHT</action>, <action>UP</action>, or <action>DOWN</action>.
-Choose the safest path to (3,3).
+Output instructions:
+1. First, PLAN your move inside <thought> tags. Analyze your current position and adjacent tiles. Check if they are safe or holes.
+2. Return ONLY the action tag: <action>...</action>.
+You have only four actions: LEFT, RIGHT, UP, DOWN.
+3. Do NOT hallucinate an <observation> tag.
+4. Do NOT output a list of actions.
+5. Do NOT output the current state or coordinates.
+6. INVALID ACTIONS: Do NOT use "FORWARD", "BACKWARD", "TURN_LEFT", or "TURN_RIGHT".
+7. VALID ACTIONS: You can ONLY use "LEFT", "RIGHT", "UP", "DOWN".
+
+Example Valid Output:
+<thought>
+I am at (0,0). (0,1) is safe. (1,0) is safe. (1,1) is a HOLE.
+I will move RIGHT to (0,1).
+</thought>
+<action>RIGHT</action>
+
+Example INVALID Output:
+<observation>... (Forbidden)
+<action>FORWARD</action> (Forbidden)
 """
 
 
@@ -51,12 +70,17 @@ class XMLParser:
     def parse(self, text: str) -> Optional[str]:
         """
         Extracts the content of the action tag.
-        Returns None if not found or malformed.
+        Returns None if not found, malformed, or if multiple tags exist.
         """
         pattern = f"<{self.tag_name}>(.*?)</{self.tag_name}>"
-        match = re.search(pattern, text, re.DOTALL | re.IGNORECASE)
-        if match:
-            return match.group(1).strip()
+        # Find ALL matches to enforce single-action constraint
+        matches = re.findall(pattern, text, re.DOTALL | re.IGNORECASE)
+        
+        if len(matches) == 1:
+            return matches[0].strip()
+        elif len(matches) > 1:
+            # Reject if agent output multiple actions (hallucination)
+            return None
         return None
 
     def format_reward(self, text: str) -> float:
