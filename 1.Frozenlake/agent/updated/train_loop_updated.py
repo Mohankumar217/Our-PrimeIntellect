@@ -9,6 +9,8 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")
 from wrapper.frozenlake_updated import load_environment_updated
 from agent.updated.trajectory_memory_updated import TrajectoryMemory
 from agent.updated.qwen_agent_updated import QwenAgentUpdated
+from verifier.outcome import reached_goal, fell_in_hole, hit_wall
+from verifier.delta import distance_delta_reward
 
 def format_trajectory_for_prompt(ep_data):
     """
@@ -66,7 +68,7 @@ def run_episode(env, agent, memory, verbose=False):
         
         # 4. Agent Generate
         # System Prompt comes from Env (Evolved)
-        print(env.current_system_prompt)
+        # print(env.current_system_prompt) # REMOVED: Too verbose
         response = agent.generate(env.current_system_prompt, prompt)
         
         # 5. Parse
@@ -76,7 +78,9 @@ def run_episode(env, agent, memory, verbose=False):
             "state_msg": current_msg,
             "response": response,
             "action": action_text if action_text else "INVALID",
-            "outcome_msg": "" # Populated after step
+            "action": action_text if action_text else "INVALID",
+            "outcome_msg": "", # Populated after step
+            "position": obs.get("position") 
         }
         
         if not action_text:
@@ -88,22 +92,86 @@ def run_episode(env, agent, memory, verbose=False):
             # Feedback
             feedback_msg = "Invalid format."
             step_record["outcome_msg"] = feedback_msg
-            episode_data["trajectory"].append(step_record)
-            if verbose: print(f"Agent Invalid: {response}")
+            # 5.5 Calculate Immediate Reward (Step-wise)
+            # We reconstruct a mini-history [step_record] just for this step's delta, 
+            # or pass the relevant info.
+            # Verifiers expect a list. 
+            step_history = [step_record] 
+            
+            # Note: Delta needs context of previous position.
+            # Step record has 'position'. We need 'previous_pos' which is handled in env but not explicitly here.
+            # Actually, 'step_record' has 'position' (current). 
+            # 'env.previous_pos' tracks prior. 
+            # We can re-use env.previous_pos logic but that's internal.
+            # Better: In 'env.step', we get observation. 
+            # Let's rely on the environment's feedback or just calculate cleanly here.
+            
+            # Simplified: Call verifiers directly with robust checking
+            r_wall = hit_wall(step_history, obs['outcome'])
+            r_hole = fell_in_hole(step_history, obs['outcome'])
+            r_goal = reached_goal(step_history, obs['outcome'])
+            
+            # Delta is tricky without history. 
+            # However, env.feedback() updates its internal state.
+            # We can approximate delta reward by manually calculating dist change.
+            # OR we can just add a 'reward' field to the observation in the wrapper? 
+            # NO, wrapper shouldn't leak reward unless we standardized it.
+            
+            # Let's calculate delta simple here:
+            prev_pos = env.previous_pos # Accessed via instance (it was updated in feedback call?)
+            # Wait, env.feedback() updates previous_pos. It was called slightly below in original code.
+            # Let's move feedback call UP or handle delta manually.
+            
+            # Let's calculate Delta manually for clarity:
+            # We need PRE-move position.
+            # 'obs' is POST-move.
+            # The agent WAS at... we didn't store it explicitly in a var, but we can infer.
+            # Actually, let's just use the `distance_delta_reward` which handles history.
+            # If we pass `[prev_step, current_step]`, it works.
+            
+            # Hack: We stored `episode_data["trajectory"]` so far.
+            # But the Current Step is not appended yet.
+            
+            # Let's append first?
+            # step_record["outcome_msg"] = feedback_msg (not yet)
+            
+            # Fix: We'll calculate Reward AFTER feedback updates.
+            pass
         else:
             # 6. Step
             next_obs = env.step(action_text)
             
             # 7. Feedback (Causal)
-            feedback_msg = env.feedback(next_obs) # This updates internal prev_pos too
+            feedback_msg = env.feedback(next_obs) # This updates internal prev_pos
             
             step_record["outcome_msg"] = feedback_msg
+            if "position" not in step_record or step_record["position"] is None:
+                 step_record["position"] = next_obs.get("position")
+
+            # --- Calculate Immediate Reward ---
+            # We construct a 2-step history for Delta: [Previous (if exists), Current]
+            history_for_reward = []
+            if len(episode_data["trajectory"]) > 0:
+                history_for_reward.append(episode_data["trajectory"][-1])
+            history_for_reward.append(step_record)
+            
+            # Calculate components
+            # Note: hit_wall uses 'outcome_msg' which we just set.
+            # fell_in_hole uses 'final_outcome' (obs['outcome'])
+            
+            r_wall = hit_wall([step_record], next_obs['outcome'])
+            r_hole = fell_in_hole([step_record], next_obs['outcome'])
+            r_goal = reached_goal([step_record], next_obs['outcome'])
+            r_delta = distance_delta_reward(history_for_reward, next_obs['outcome'])
+            
+            step_reward = r_wall + r_hole + r_goal + r_delta
+            step_record["reward"] = step_reward
+            
             episode_data["trajectory"].append(step_record)
             
-            obs = next_obs
-            
             if verbose:
-                print(f"Step {step_count}: {action_text} -> {feedback_msg}")
+                pos = obs.get("position", "Unknown")
+                print(f"[Step {step_count} @ {pos}] Action: {action_text} >> {feedback_msg}")
 
             if obs["terminated"]:
                 episode_data["final_outcome"] = obs["outcome"]
@@ -120,7 +188,7 @@ def run_episode(env, agent, memory, verbose=False):
     actions_list = [s["action"] for s in episode_data["trajectory"]]
     texts_list = [s["response"] for s in episode_data["trajectory"]]
     
-    score = env.rubric.calculate_score(actions_list, episode_data["final_outcome"], texts_list, env.parser)
+    score = env.rubric.calculate_score(episode_data["trajectory"], episode_data["final_outcome"], texts_list, env.parser)
     episode_data["score"] = score
     
     if verbose:
@@ -146,11 +214,13 @@ def train_loop(episodes=20, verbose=True):
         ep_data = run_episode(env, agent, memory, verbose=verbose)
         
         # 3. Memory & Selection
-        # Only add valid runs (score > 0 implies some success or at least not total fail, 
-        # but fitness logic handles sorting. We generally only want to store 'goals' or 'high progress'.)
-        # If we store failures, they might push out empty slots?
-        # Let's add all, Memory class filters Top-K.
-        memory.add_episode(ep_data)
+        # Always update Q-Table with experience
+        memory.update_q_table(ep_data)
+
+        # Only add valid runs (score > 0). Storing failures (score <= 0) would reward "Fast Suicide".
+        if ep_data['score'] > 0:
+            print(f"*** SUCCESS! Saving Episode (Score: {ep_data['score']}) ***")
+            memory.add_episode(ep_data)
         
         # 4. Evolution (Every 3 episodes)
         if (i + 1) % 3 == 0:

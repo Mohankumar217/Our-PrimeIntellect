@@ -8,7 +8,7 @@ class QwenAgentUpdated:
     Includes a fallback Mock mode if torch/transformers fails to load
     (allowing logic verification of the PI system without GPU/Env).
     """
-    def __init__(self, model_name: str = "Qwen/Qwen2.5-1.5B-Instruct"):
+    def __init__(self, model_name: str = "Qwen/Qwen2.5-3B-Instruct"):
         self.mock_mode = False
         self.tokenizer = None
         self.model = None
