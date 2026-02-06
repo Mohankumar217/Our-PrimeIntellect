@@ -1,0 +1,20 @@
+\frametitle{Memory Architecture (`memory.json`)}
+The memory is no longer a list of strings. It is a structured \textbf{Lookup Table} (Q-Table) that maps states to action values.
+
+    \begin{block}{Structure of the Q-Table}
+\begin{verbatim}
+{
+  "(0, 0)": {          // State (Coordinate)
+    "UP": -0.1,        // Bad Action
+    "DOWN": 0.0,
+    "LEFT": 0.0,
+    "RIGHT": 0.8       // Highly Recommended
+  },
+  "(0, 1)": {
+    ...
+  }
+}
+\end{verbatim}
+    \end{block}
+    \vspace{0.2cm}
+    \textbf{Key Idea:} We do not just replay history. We \textbf{aggregate} history into scores that guide the VLM's future decisions.

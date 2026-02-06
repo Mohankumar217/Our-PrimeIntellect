@@ -1,0 +1,274 @@
+\documentclass{beamer}
+
+% Theme selection
+\usetheme{Madrid}
+\usecolortheme{default}
+\setbeamertemplate{navigation symbols}{}
+
+% Packages
+\usepackage{booktabs}
+\usepackage{tikz}
+\usepackage{listings}
+\usepackage{xcolor}
+
+% Metadata
+\title[From LLM to VLM Agents]{From LLM-Style to VLM-Style Agents: FrozenLake as a Case Study}
+\subtitle{Prime-Intellect-Inspired Agent Architecture}
+\author{Prime Intellect Research}
+\date{\today}
+
+\begin{document}
+
+% SLIDE 1: Title Slide
+\begin{frame}
+    \titlepage
+\end{frame}
+
+% SLIDE 2: Difficulties with LLM-Style Agents in FrozenLake
+\begin{frame}{Difficulties with LLM-Style Agents in FrozenLake}
+    \begin{alertblock}{The "Blindness" Problem}
+        \begin{itemize}
+            \item \textbf{Perfect State Assumption}: LLMs rely on the environment providing exact coordinates or descriptions.
+            \item \textbf{No Perception}: The agent cannot ``see''; it only reads textual logs.
+            \item \textbf{Grounding Issues}: If the text description is ambiguous or missing, the agent fails immediately.
+            \item \textbf{Sim-to-Real Gap}: Real-world environments (robotics, web UI) do not provide structured text states.
+        \end{itemize}
+    \end{alertblock}
+    \vspace{0.5cm}
+    \centering
+    \textbf{\Large ``LLM agents are powerful planners but blind.''}
+\end{frame}
+
+% SLIDE 3: Advantages of Vision-Language Models (VLMs)
+\begin{frame}{Advantages of Vision-Language Models (VLMs)}
+    \begin{block}{Why Switch to VLMs?}
+        \begin{itemize}
+            \item \textbf{Visual Grounding}: The agent perceives the environment directly (pixels), just like a human.
+            \item \textbf{Implicit State Understanding}: No need for the environment to "confess" its state in text.
+            \item \textbf{Robustness}: Better handling of unstructured environments where text descriptions are hard to generate.
+            \item \textbf{Universal Interface}: Pixels are a universal API for games, robotics, and tools.
+        \end{itemize}
+    \end{block}
+    \vspace{0.3cm}
+    \textit{VLMs bridge the gap between high-level reasoning and raw sensory data.}
+\end{frame}
+
+% SLIDE 4: Ideological Shift: LLM $\rightarrow$ VLM
+\begin{frame}{Ideological Shift: LLM $\rightarrow$ VLM}
+    \begin{table}
+        \centering
+        \begin{tabular}{lcc}
+            \toprule
+            \textbf{Aspect} & \textbf{LLM Style} & \textbf{VLM Style} \\
+            \midrule
+            Observation & Text Description & Image / Video Frame \\
+            Knowledge & Explicitly Given & Visually Inferred \\
+            Intelligence & Pure Planning & Perception + Planning \\
+            Input & Prompt & Prompt + Image \\
+            \bottomrule
+        \end{tabular}
+    \end{table}
+    \vspace{1cm}
+    \centering
+    \textbf{\Large ``The agent must see before it can think.''}
+\end{frame}
+
+% SLIDE 5: What is VLM-Style FrozenLake?
+\begin{frame}{What is VLM-Style FrozenLake?}
+    \begin{itemize}
+        \item \textbf{Environment Invariance}:
+        \begin{itemize}
+            \item Same physics (`frozenlake\_world.py`).
+            \item Same actions (UP, DOWN, LEFT, RIGHT).
+            \item Same evaluation criteria (+1 Goal, -1 Hole).
+        \end{itemize}
+        \item \textbf{Visual Observation}: Instead of text coordinates, the agent receives a rendered image (`frame\_x.png`).
+        \item \textbf{Prime Intellect Constraints}:
+        \begin{itemize}
+            \item \textbf{No Training}: Weights are frozen.
+            \item \textbf{No Fine-Tuning}: No gradient updates.
+            \item \textbf{No RL}: Learning via selection.
+        \end{itemize}
+    \end{itemize}
+\end{frame}
+
+% SLIDE 6: Architecture of VLM-Style FrozenLake
+\begin{frame}{Architecture of VLM-Style FrozenLake}
+    \begin{block}{Components}
+        \begin{itemize}
+            \item \textbf{Environment + Renderer}: The symbolic world now pipes state to a renderer to generate pixels.
+            \item \textbf{Wrapper (Multimodal)}: Constructs a prompt combining the image and task instructions.
+            \item \textbf{VLM}: Processes the visual field to identify the agent (Red Dot) and hazards (Holes) before reasoning.
+            \item \textbf{Client}: Manages the selection-based memory system (`memory.json`).
+        \end{itemize}
+    \end{block}
+    \vspace{0.3cm}
+    \textit{Note: The architecture remains identical to LLM style; only the observation pipeline changes.}
+\end{frame}
+
+% SLIDE 7: Detailed Environment Execution Flow
+\begin{frame}{Detailed Environment Execution Flow}
+    \begin{enumerate}
+        \item \textbf{Step 0: Initialization}: 
+            \begin{itemize}
+                \item Agent starts at (0,0).
+                \item Renderer saves initial view as \texttt{frame\_0.png}.
+            \end{itemize}
+        \item \textbf{Step t: Observation}: 
+            \begin{itemize}
+                \item Wrapper reads \texttt{frame\_t.png}.
+                \item Constructs prompt: \textit{"Current view is \texttt{frame\_t.png}..."}
+            \end{itemize}
+        \item \textbf{Step t: Action}: 
+            \begin{itemize}
+                \item VLM sees frame $\rightarrow$ Decides \texttt{<action>RIGHT</action>}.
+                \item Environment executes move.
+            \end{itemize}
+        \item \textbf{Step t+1: Update}: 
+            \begin{itemize}
+                \item Agent moves to new tile.
+                \item Renderer generates \texttt{frame\_\{t+1\}.png}.
+                \item Loop repeats with new frame.
+            \end{itemize}
+    \end{enumerate}
+    \vspace{0.2cm}
+    \centering
+    \texttt{frame\_t.png $\rightarrow$ VLM $\rightarrow$ Action $\rightarrow$ Env $\rightarrow$ frame\_\{t+1\}.png}
+\end{frame}
+
+% SLIDE 8: Memory Architecture (memory.json)
+\begin{frame}[fragile]{Memory Architecture (`memory.json`)}
+    The memory is no longer a list of strings. It is a structured \textbf{Lookup Table} (Q-Table) that maps states to action values.
+    
+    \begin{block}{Structure of the Q-Table}
+\begin{verbatim}
+{
+  "(0, 0)": {          // State (Coordinate)
+    "UP": -0.1,        // Bad Action
+    "DOWN": 0.0,
+    "LEFT": 0.0,
+    "RIGHT": 0.8       // Highly Recommended
+  },
+  "(0, 1)": {
+    ...
+  }
+}
+\end{verbatim}
+    \end{block}
+    \vspace{0.2cm}
+    \textbf{Key Idea:} We do not just replay history. We \textbf{aggregate} history into scores that guide the VLM's future decisions.
+\end{frame}
+
+% SLIDE 9: Memory Selection & Utilization
+\begin{frame}{Memory: The Implicit Q-Table}
+    \begin{itemize}
+        \item \textbf{Structure (Q-Table)}:
+        \begin{itemize}
+            \item Instead of storing full lists of steps, we store the aggregate \textbf{value} of actions.
+            \item \texttt{memory.json}: Maps \textbf{Visual State} $\rightarrow$ \textbf{\{Action: Score\}}.
+        \end{itemize}
+        \item \textbf{Update Mechanism (Online Learning)}:
+        \begin{itemize}
+            \item After every step, the system performs a \textbf{Q-Learning Update}:
+            \item $Q(s,a) \leftarrow Q(s,a) + \alpha [R + \gamma \max Q(s',a') - Q(s,a)]$
+            \item This happens ``outside'' the VLM, updating the context for future episodes.
+        \end{itemize}
+        \item \textbf{Utilization (In-Context RL)}:
+        \begin{itemize}
+            \item The VLM receives the scores for its \textbf{current location} as a "Hint".
+            \item Prompt: \textit{``History suggests: UP(-0.1), RIGHT(1.2).''}
+            \item The VLM combines this \textbf{symbolic advice} with its \textbf{visual perception} to decide.
+        \end{itemize}
+    \end{itemize}
+    
+    \begin{alertblock}{Crucial Distinction}
+        The Q-Table is \textbf{not} the agent; it is just a tool (a "cheat sheet").
+        \begin{itemize}
+            \item \textbf{Standard RL}: The table dictates the action ($\arg\max Q$).
+            \item \textbf{VLM Agent}: The VLM \textbf{sees} the image, considers the table's advice, but uses its \textbf{visual perception} to make the final decision.
+        \end{itemize}
+    \end{alertblock}
+\end{frame}
+
+% SLIDE 10: LLM Style vs VLM Style Comparison
+\begin{frame}{LLM Style vs VLM Style Comparison}
+    \begin{table}
+        \centering
+        \begin{tabular}{lcc}
+            \toprule
+            \textbf{Criterion} & \textbf{LLM Style} & \textbf{VLM Style} \\
+            \midrule
+            Performance & High (Easy) & Lower (Harder) \\
+            Cost & Low (Tokens only) & High (Image processing) \\
+            Grounding & Weak & Strong \\
+            Generalization & Poor & Better \\
+            Need for Training & No & No \\
+            Sim. to Reality & Low & High \\
+            \bottomrule
+        \end{tabular}
+    \end{table}
+\end{frame}
+
+% SLIDE 11: Is VLM Needed for FrozenLake?
+\begin{frame}{Is VLM Needed for FrozenLake?}
+    \begin{itemize}
+        \item[\textcolor{red}{\textbf{\texttimes}}] \textbf{Not needed for solving FrozenLake}:
+        \begin{itemize}
+            \item The state space is small and discrete.
+            \item Symbolic solvers or simple LLMs solve it efficiently.
+        \end{itemize}
+        \item[\textcolor{green}{\textbf{\checkmark}}] \textbf{Useful for Research}:
+        \begin{itemize}
+            \item \textbf{Architectural Validation}: Verifies the multimodal pipeline works.
+            \item \textbf{Perception Grounding}: Tests if the model can map pixels to concepts (``Hole'', ``Safe'').
+            \item \textbf{Research Realism}: Simulates constraints of real-world robotics.
+        \end{itemize}
+    \end{itemize}
+    \vspace{0.5cm}
+    \centering
+    \textbf{``VLM FrozenLake is for research, not performance.''}
+\end{frame}
+
+% SLIDE 12: When Should You Use VLMs?
+\begin{frame}{When Should You Use VLMs?}
+    \begin{columns}
+        \begin{column}{0.5\textwidth}
+            \textbf{Use LLMs when...}
+            \begin{itemize}
+                \item State is natively text or code.
+                \item High precision logic is required.
+                \item Low latency/cost is critical.
+                \item Representation is symbolic (Database, CLI).
+            \end{itemize}
+        \end{column}
+        \begin{column}{0.5\textwidth}
+            \textbf{Use VLMs when...}
+            \begin{itemize}
+                \item State is unstructured (Pixels, Camera).
+                \item Environment details are not pre-parsed.
+                \item Spatial reasoning is required.
+                \item Interaction involves GUI or Physical World.
+            \end{itemize}
+        \end{column}
+    \end{columns}
+    \vspace{0.5cm}
+    \centering
+    FrozenLake is Symbolic $\rightarrow$ LLM is natively better.\\
+    Real World is Visual $\rightarrow$ VLM is required.
+\end{frame}
+
+% SLIDE 13: Final Takeaways
+\begin{frame}{Final Takeaways}
+    \begin{itemize}
+        \item \textbf{Universal Loop}: The Agent-Environment loop remains invariant regardless of modality.
+        \item \textbf{Ideology Preserved}: Evolution happens via memory selection, not parameter updates.
+        \item \textbf{Stepping Stone}: FrozenLake verifies the VLM architecture before scaling to complex visual tasks (e.g., Minecraft, WebAgent).
+    \end{itemize}
+    \vspace{1cm}
+    \centering
+    \Large
+    ``LLM agents evolve thoughts.\\
+    VLM agents evolve perception.''
+\end{frame}
+
+\end{document}
