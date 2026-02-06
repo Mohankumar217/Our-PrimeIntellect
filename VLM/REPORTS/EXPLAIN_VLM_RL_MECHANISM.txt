@@ -1,0 +1,59 @@
+CORRECTED: THE VISUAL Q-MEMORY ARCHITECTURE
+=============================================
+
+You are absolutely correct. My previous explanation had a critical flaw:
+It stored *trajectories* (sequences) but ignored the *visual context* of each step. Knowing "I went RIGHT" is useless if I don't know *what I was looking at* when I decided to go RIGHT.
+
+We need a **Visual Q-Table**.
+
+1. THE MEMORY STRUCTURE (THE VISUAL Q-TABLE)
+--------------------------------------------
+Instead of a list of episodes, `memory.json` will become a Dictionary (Map) where:
+- **Keys**: A unique signature (Hash) of the **Visual State** (The Image).
+- **Values**: A scorecard for that specific image.
+
+**Conceptual Schema:**
+```json
+{
+  "hash_of_frame_at_0_0": {
+    "RIGHT": 0.1,    // "Moving Right got me closer"
+    "LEFT": -0.1,    // "Moving Left hit a wall"
+    "UP": -0.1,      // "Moving Up hit a wall"
+    "DOWN": -1.0     // "Moving Down killed me (Hole)"
+  },
+  "hash_of_frame_at_0_1": {
+    "RIGHT": -0.1,   // "Moving Right moved me away"
+    "DOWN": 1.0      // "Moving Down hit the Goal!"
+  }
+}
+```
+
+2. THE NEW LEARNING LOOP
+------------------------
+Step 1: Observation & Hashing
+- The Agent sees the Current Frame.
+- The System generates only a **Visual Hash** of this frame (e.g., `sha256(pixels)`). *Note: The agent doesn't need to know the coordinates, just that "This Image = Hash X".*
+
+Step 2: Retrieval (The "Look Up")
+- The Wrapper checks `memory.json` for `Hash X`.
+- It finds: `{ RIGHT: 0.1, DOWN: -1.0 }`.
+
+Step 3: Prompt Injection (Context)
+- The Prompt tells the VLM: 
+  "SYSTEM: You are in a familiar spot.
+   MEMORY: In the past, when looking at this view:
+   - RIGHT gave score +0.1 (Good)
+   - DOWN gave score -1.0 (Death)
+   - LEFT is unknown."
+   
+Step 4: Decision
+- The VLM, seeing this logic, chooses **RIGHT** (Exploitation) or **LEFT** (Exploration).
+- It avoids DOWN because it knows it leads to death.
+
+3. WHY THIS IS BETTER
+---------------------
+- **State-Specific**: The agent doesn't blindly follow a path. It reacts to *what it sees right now*.
+- **Cumulative Wisdom**: Every episode updates this table. If Episode 10 tries "UP" and fails, Episode 11 sees that failure in the score and avoids it.
+- **True RL**: This implements Q-Learning `Q(s, a)` purely via storage and text retrieval, without gradient updates.
+
+This is the architecture I will now build.

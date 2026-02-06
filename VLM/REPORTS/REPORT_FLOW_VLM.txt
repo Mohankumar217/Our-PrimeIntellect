@@ -1,0 +1,49 @@
+FROZEN LAKE VLM: EXECUTION FLOW (PRIME INTELLECT)
+=================================================
+
+This document outlines the lifecycle of the VLM "Learning Loop," emphasizing visual perception and multimodal prompting.
+
+PHASE 1: INITIALIZATION & RETRIEVAL
+-----------------------------------
+(1) Bootstrap: `run_agent.py` starts.
+(2) Memory Load: `memory.json` is loaded. High-scoring visual episodes are retrieved.
+(3) World Reset: Agent placed at Start (0,0).
+(4) Rendering: `renderer.render()` generates the initial `frame_0.png`.
+
+PHASE 2: THE VISUAL INTERACTION LOOP
+------------------------------------
+Step 1: Observation
+The Wrapper receives the `frame_0.png` and constructs the prompt:
+    - Text: "You are an agent... <action>UP|DOWN...</action>"
+    - Image: [Binary Image Data]
+    - Memory: "Previous success: <Action>RIGHT</Action>"
+
+Step 2: Visual Reasoning
+The VLM Model processes the image and text:
+    - Prompt: "Observe the grid. The red dot is you. The dark tiles are holes."
+    - Output: "<thought>I see a hole below me. I should go right.</thought><action>RIGHT</action>"
+
+Step 3: Parsing
+The `XMLParser` extracts "RIGHT" from the response.
+
+Step 4: Execution
+The World executes `step("RIGHT")`.
+    - Agent moves to (0,1).
+    - New state is rendered to `frame_1.png`.
+
+Step 5: Trajectory Recording
+The system records: `{Image, Action, Outcome}`.
+
+PHASE 3: PERSISTENCE & SELECTION
+--------------------------------
+The loop ends (Goal/Hole).
+
+(1) Evaluation: 
+    - Hit Goal? Score +1.0. 
+    - Hit Hole? Score -1.0.
+(2) Selection:
+    - If Score > Threshold: SAVE to `memory.json`.
+    - If Score <= Threshold: DISCARD.
+(3) Evolution: 
+    - The next episode starts with a potentially richer memory bank.
+    - No gradient updates occur. The agent improves purely by remembering valid paths.

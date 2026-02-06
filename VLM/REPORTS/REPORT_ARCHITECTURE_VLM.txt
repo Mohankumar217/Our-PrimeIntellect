@@ -1,0 +1,52 @@
+FROZEN LAKE VLM ENVIRONMENT: SYSTEM ARCHITECTURE (PRIME INTELLECT)
+==================================================================
+
+The system has evolved from a text-only RL environment to a "Prime-Intellect" VLM cognitive architecture. It features visual state representation, multimodal prompting, and selection-based learning.
+
+1. THE PHYSICS LAYER ("The World")
+----------------------------------
+File: VLM/World/frozenlake_world.py
+Class: FrozenLakeWorld
+
+This layer remains the immutable ground truth (Logic).
+    - State: Grid (4x4), Agent Position, Holes, Goals.
+    - Dynamics: Deterministic movement (LEFT/RIGHT/UP/DOWN).
+    - Status: Identical to LLM version. Logic is modality-agnostic.
+
+2. THE VISUAL LAYER ("The Renderer") [NEW]
+------------------------------------------
+File: VLM/World/frozenlake_renderer.py
+Class: FrozenLakeRenderer
+
+This layer transforms logic into pixels.
+    - Input: World State.
+    - Output: PIL.Image (RGB).
+    - Philosophy: Show, don't tell. No text labels or coordinate hints are provided. The agent must infer state from the visual pattern.
+
+3. THE INTERFACE LAYER ("The VLM Wrapper")
+------------------------------------------
+File: VLM/Wrapper/vlm_wrapper.py
+
+This layer bridges the gap between pixels and the language model.
+    - Multimodal Prompting: Constructs a composite prompt containing the System Instruction, Visual Memories, and the Current Frame.
+    - XML Parsing: Extracts user intent (`<action>`) from the model's text output.
+    - Constraint: Ensures no leaking of symbolic state (e.g., coordinates) into the prompt.
+
+4. THE COGNITIVE LAYER ("Memory & Orchestration")
+-------------------------------------------------
+File: VLM/Client/run_agent.py
+
+The "brain" of the operation.
+    - Orchestrator: Manages the `Observe -> Reason -> Act` loop.
+    - Memory Manager: Loads `memory.json` (Q-Table).
+    - Q-Learning Update: Updates action values for visited states after every step ($Q(s,a) \leftarrow R + \gamma \max Q'$).
+
+DATA FLOW DIAGRAM (VLM)
+-----------------------
+[ Q-TABLE MEMORY.json ] -> (Inject Values) -> [ MULTIMODAL PROMPT ]
+       ^                                            |
+       | (Update Q-Values)                          v
+[ RUN AGENT ] <----> [ VLM MODEL ] <-------- [ WRAPPER ]
+       |                                            |
+       v                                            v
+[ EVALUATION ] <------ [ RENDERER ] <------- [ PHYSICS WORLD ]
