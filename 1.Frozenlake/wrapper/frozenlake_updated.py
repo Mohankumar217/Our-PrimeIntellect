@@ -6,7 +6,10 @@ import math
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from World.frozenlake_world import FrozenLakeWorld
+from World.frozenlake_world import FrozenLakeWorld
 from wrapper.frozenlake import XMLParser, Rubric, reached_goal, fell_in_hole, step_efficiency
+from verifier.outcome import hit_wall
+from verifier.delta import distance_delta_reward
 
 # --- 1. Strategic/Causal Feedback ---
 
@@ -165,9 +168,10 @@ def load_environment_updated(grid_map=None, **kwargs):
     parser = RobustParser()
     
     rubric = Rubric()
-    rubric.add_verifier(reached_goal, weight=1.0)
-    rubric.add_verifier(fell_in_hole, weight=1.0)
-    rubric.add_verifier(step_efficiency, weight=1.0)
+    rubric.add_verifier(reached_goal, weight=2.0) # Bonus for goal to distinguish from just moving close
+    rubric.add_verifier(fell_in_hole, weight=1.0) # -1.0
+    rubric.add_verifier(hit_wall, weight=1.0)      # -1.0
+    rubric.add_verifier(distance_delta_reward, weight=1.0) # +/- 0.5
     
     return FrozenLakeEnvironmentUpdated(
         world=world,
