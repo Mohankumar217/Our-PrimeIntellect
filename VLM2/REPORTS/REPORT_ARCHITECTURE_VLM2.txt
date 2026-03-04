@@ -1,0 +1,139 @@
+FROZEN LAKE VLM2 (VIDEO-ONLY) ENVIRONMENT: SYSTEM ARCHITECTURE
+===============================================================
+
+The system implements a pure "Video-Only Learning" architecture. Unlike VLM (which uses Vision-Language Models with prompts), VLM2 uses only computer vision modules. All learning signals are derived exclusively from video frames.
+
+1. THE PHYSICS LAYER ("The World")
+----------------------------------
+File: VLM2/World/frozenlake_game.py
+Class: FrozenLakeGame
+
+This layer remains the immutable ground truth (Logic).
+    - State: Grid (4x4), Agent Position, Holes, Goals.
+    - Dynamics: Deterministic movement (LEFT/RIGHT/UP/DOWN).
+    - Status: Hidden from the agent. NO symbolic state access.
+
+2. THE VIDEO RENDERING LAYER ("The Renderer")
+----------------------------------------------
+File: VLM2/World/video_renderer.py
+Class: FrozenLakeVideoRenderer
+
+This layer transforms logic into pixels.
+    - Input: Agent position (row, col).
+    - Output: PIL.Image (RGB frame).
+    - Color Coding:
+        • Blue (0,0,255) = Agent
+        • Red (255,0,0) = Hole
+        • Green (0,255,0) = Goal
+        • White (255,255,255) = Safe tile
+    - Philosophy: Pure visual. No text, no labels, no coordinate hints.
+
+3. THE VIDEO BUILDING LAYER ("The Encoder")
+--------------------------------------------
+File: VLM2/World/video_builder.py
+Class: EpisodeVideoBuilder
+
+This layer stitches frames into videos.
+    - Input: List of PIL Images (episode frames).
+    - Output: MP4 video file.
+    - Purpose: Create visual records of episodes for human review and future training.
+
+4. THE PERCEPTION LAYER ("The Eyes")
+-------------------------------------
+File: VLM2/Wrapper/video_perception.py
+Class: VideoPerceptionLayer
+
+This layer infers state-like information ONLY from pixels.
+    - Input: Current frame (PIL Image).
+    - Output: Observation dictionary:
+        • agent_visible: bool
+        • goal_direction: str ("down-right", "up", etc.)
+        • danger_nearby: bool
+        • movement_detected: bool
+    - Methods:
+        • Color-based agent/goal position detection
+        • Adjacent cell danger scanning (red pixel detection)
+        • Relative direction calculation
+    - Constraint: NO access to game grid or coordinates.
+
+5. THE ACTION INFERENCE LAYER ("The Motion Detector")
+------------------------------------------------------
+File: VLM2/Verifier/action_inference.py
+Class: ActionInferenceModule
+
+This layer infers actions by comparing frames.
+    - Input: Frame(t), Frame(t+1).
+    - Output: Action name ('LEFT', 'RIGHT', 'UP', 'DOWN', 'STAY').
+    - Method: Detect agent position in both frames, calculate movement direction.
+    - Purpose: Reverse-engineer what action was taken (for memory recording).
+
+6. THE OUTCOME INFERENCE LAYER ("The Judge")
+---------------------------------------------
+File: VLM2/Verifier/outcome_inference.py
+Class: OutcomeInferenceModule
+
+This layer detects success/failure from visuals.
+    - Input: Current frame, previous frame, max_steps_reached flag.
+    - Output: Outcome dictionary:
+        • terminal: bool
+        • outcome: 'success' | 'failure' | 'timeout' | 'ongoing'
+        • progress: 'positive' | 'negative' | 'neutral'
+    - Detection Rules:
+        • Agent on green tile → Success
+        • Agent on red tile → Failure
+        • Agent disappears → Failure (fell in hole)
+        • Max steps reached → Timeout
+        • Distance to goal decreases → Positive progress
+    - Constraint: NO reward function access.
+
+7. THE MEMORY LAYER ("The Experience Bank")
+--------------------------------------------
+File: VLM2/Memory/trajectory_memory.py
+Class: TrajectoryMemory
+
+This layer stores situational experiences.
+    - Structure: List of experience dictionaries:
+        {
+          "situation": "Goal is down-right, Danger nearby",
+          "action": "Action 2",
+          "outcome": "success",
+          "lesson": "Successfully reached the goal"
+        }
+    - Selection Rules:
+        • Success → ALWAYS store
+        • Failure → Store only if novel (not seen before)
+    - Retrieval: Keyword-based similarity matching
+    - Pruning: Keep top-K most informative (successes prioritized)
+    - Contrast with VLM: NO Q-table, NO state-action values
+
+8. THE ORCHESTRATION LAYER ("The Environment")
+-----------------------------------------------
+File: VLM2/Wrapper/video_environment.py
+Class: VideoBasedEnvironment
+
+This is the agent-facing interface.
+    - Initialization: Creates all modules, loads memory.
+    - reset(): Returns initial frame.
+    - step(action): Returns {frame, observation, outcome, done}.
+    - run_episode_with_agent(agent_fn): Full episode loop.
+    - Constraints Enforced:
+        • Agent receives ONLY frames
+        • NO symbolic state exposure
+        • NO direct reward signals
+
+DATA FLOW DIAGRAM (VLM2)
+-----------------------
+[ TRAJECTORY MEMORY ] -> (Retrieve Experiences) -> [ AGENT FUNCTION ]
+       ^                                                 |
+       | (Store Novel)                                   v
+[ EXPERIENCE SELECTOR ] <----- [ OUTCOME INFERENCE ] <- [ ACTION ]
+                                      |                   |
+                                      v                   v
+                            [ VIDEO PERCEPTION ] <- [ CURRENT FRAME ]
+                                                          |
+                                                          v
+                                            [ VIDEO RENDERER ] <- [ GAME ENGINE ]
+
+KEY DIFFERENCE FROM VLM:
+- VLM: Uses Vision-Language Model, multimodal prompts, Q-table memory, XML parsing.
+- VLM2: Uses pure computer vision, no language model, trajectory memory, heuristic/VLM agents.

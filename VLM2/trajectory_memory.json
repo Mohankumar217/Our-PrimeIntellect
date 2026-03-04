@@ -1,0 +1,47 @@
+{
+  "trajectories": [
+    {
+      "situation": "Agent visible, Goal is right, Movement detected",
+      "action": "Action 1",
+      "outcome": "failure",
+      "lesson": "Avoid this action in this situation"
+    },
+    {
+      "situation": "Agent visible, Goal is same, Danger nearby, Movement detected",
+      "action": "Action 2",
+      "outcome": "success",
+      "lesson": "Successfully reached the goal"
+    },
+    {
+      "situation": "Agent visible, Goal is down, Danger nearby, Movement detected",
+      "action": "Action 2",
+      "outcome": "failure",
+      "lesson": "Avoid this action in this situation"
+    },
+    {
+      "situation": "Agent visible, Goal is same, Danger nearby, Movement detected",
+      "action": "Action 2",
+      "outcome": "success",
+      "lesson": "Successfully reached the goal"
+    },
+    {
+      "situation": "Agent visible, Goal is down-right, Movement detected",
+      "action": "Action 2",
+      "outcome": "failure",
+      "lesson": "Avoid this action in this situation"
+    },
+    {
+      "situation": "Agent visible, Goal is same, Danger nearby, Movement detected",
+      "action": "Action 2",
+      "outcome": "success",
+      "lesson": "Successfully reached the goal"
+    }
+  ],
+  "success_count": 3,
+  "failure_count": 3,
+  "seen_failures": [
+    "Agent visible, Goal is right, Movement detected|Action 1",
+    "Agent visible, Goal is down-right, Movement detected|Action 2",
+    "Agent visible, Goal is down, Danger nearby, Movement detected|Action 2"
+  ]
+}

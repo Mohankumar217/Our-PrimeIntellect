@@ -1,0 +1,114 @@
+FROZEN LAKE VLM2: EXECUTION FLOW (VIDEO-ONLY LEARNING)
+======================================================
+
+This document outlines the lifecycle of the VLM2 "Video Learning Loop," emphasizing pure visual perception and computer vision inference.
+
+PHASE 1: INITIALIZATION & RETRIEVAL
+-----------------------------------
+(1) Bootstrap: `Wrapper/video_environment.py` (VideoBasedEnvironment) initializes.
+(2) Module Creation:
+    - FrozenLakeGame (hidden physics engine)
+    - FrozenLakeVideoRenderer (frame generator)
+    - VideoPerceptionLayer (visual inference)
+    - ActionInferenceModule (movement detector)
+    - OutcomeInferenceModule (success/failure detector)
+    - TrajectoryMemory (experience storage)
+(3) Memory Load: `trajectory_memory.json` is loaded (if exists).
+(4) World Reset: Agent placed at Start (0,0).
+(5) Initial Frame: `renderer.render_frame(0, 0)` generates the first RGB frame.
+
+PHASE 2: THE VIDEO OBSERVATION LOOP
+------------------------------------
+Step 1: Visual Observation
+The environment provides the current frame (PIL Image) to the agent.
+    - RGB pixels showing: Blue agent, Red holes, Green goal, White safe tiles.
+    - NO text, NO coordinates, NO symbolic information.
+
+Step 2: Perception Inference
+The VideoPerceptionLayer analyzes the frame:
+    - Detects agent position by finding blue pixels (color matching).
+    - Detects goal position by finding green pixels.
+    - Calculates relative direction: "down-right", "up", etc.
+    - Scans adjacent cells for red pixels (danger detection).
+    - Returns observation dict: {agent_visible, goal_direction, danger_nearby, movement_detected}
+
+Step 3: Memory Retrieval
+The Environment converts observation to natural language summary:
+    - Example: "Goal is down-right, Danger nearby"
+    
+TrajectoryMemory retrieves relevant past experiences:
+    - Keyword-based matching on situation descriptions.
+    - Prioritizes success experiences.
+    - Returns top-K most similar memories.
+
+Step 4: Agent Decision
+The agent function receives:
+    - frame: PIL Image
+    - observation: Perception dict
+    - memories: List of relevant past experiences
+    
+Agent returns action ID (0=LEFT, 1=DOWN, 2=RIGHT, 3=UP).
+    - Heuristic agent: Uses goal direction + danger avoidance rules.
+    - Future VLM agent: Would process frame with vision model.
+
+Step 5: Action Execution
+The hidden game engine executes the action:
+    - Agent moves to new position.
+    - Renderer generates new frame showing updated agent position.
+
+Step 6: Outcome Inference
+OutcomeInferenceModule analyzes the new frame:
+    - Check: Is agent on green tile? → SUCCESS
+    - Check: Is agent on red tile? → FAILURE
+    - Check: Did agent disappear? → FAILURE (fell in hole)
+    - Check: Max steps reached? → TIMEOUT
+    - Check: Distance to goal changed? → PROGRESS (positive/negative/neutral)
+    
+Returns outcome dict: {terminal, outcome, progress}
+
+Step 7: Trajectory Recording
+If terminal state reached, create experience entry:
+    - situation: Observation summary
+    - action: Action taken
+    - outcome: success/failure/timeout
+    - lesson: What was learned
+    
+Example success experience:
+    {
+      "situation": "Goal is down-right, Agent visible",
+      "action": "Action 2",
+      "outcome": "success",
+      "lesson": "Successfully reached the goal"
+    }
+
+PHASE 3: EXPERIENCE SELECTION & PERSISTENCE
+-------------------------------------------
+The loop ends when terminal state is reached.
+
+(1) Selection Rules:
+    - Success? → ALWAYS SAVE to memory.
+    - Failure? → Save only if NOVEL (new situation-action combination).
+    - Timeout? → Discard (not informative).
+
+(2) Memory Pruning:
+    - If memory exceeds max_size, prune to keep top-K most informative.
+    - Informativeness score: Success=10, Failure=5, Other=1.
+
+(3) Video Generation:
+    - EpisodeVideoBuilder stitches all frames into MP4 video.
+    - Saved to `videos/episode_XXXX.mp4`.
+
+(4) Persistence:
+    - TrajectoryMemory saved to `trajectory_memory.json`.
+    - Structure: List of {situation, action, outcome, lesson} dicts.
+
+(5) Evolution:
+    - Next episode starts with enriched memory bank.
+    - Agent can learn from past visual experiences.
+    - NO gradient updates, NO training. Pure selection-based learning.
+
+KEY DIFFERENCES FROM VLM:
+- NO multimodal prompts or language model calls.
+- NO Q-value updates or Bellman equations.
+- Learning is purely experiential (remember successes, avoid novel failures).
+- Memory is trajectory-based, not state-action value based.

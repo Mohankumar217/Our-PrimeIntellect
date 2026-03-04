@@ -1,0 +1,129 @@
+VLM2 VIDEO-ONLY LEARNING MECHANISM
+===================================
+
+This document explains how VLM2 achieves learning through pure video observation, without language models, symbolic state, or explicit reward functions.
+
+1. THE CORE PHILOSOPHY: VIDEO AS SINGLE SOURCE OF TRUTH
+--------------------------------------------------------
+Unlike VLM (which uses Vision-Language Models with Q-tables), VLM2 enforces a strict constraint:
+
+    "The agent must learn ONLY from what it can SEE in video frames."
+
+This means:
+    - NO symbolic state (x, y coordinates, grid arrays, tile IDs).
+    - NO direct reward signals from the environment.
+    - NO text prompts, XML parsing, or language model reasoning.
+    - ONLY RGB pixels, computer vision inference, and experiential memory.
+
+2. THE MEMORY STRUCTURE: TRAJECTORY-BASED EXPERIENCES
+------------------------------------------------------
+VLM used a Q-Table mapping visual hashes to action values. VLM2 uses a different approach: **Trajectory Memory**.
+
+Structure:
+Each experience is a dictionary:
+```json
+{
+  "situation": "Goal is down-right, Danger nearby",
+  "action": "Action 2",
+  "outcome": "success",
+  "lesson": "Successfully reached the goal"
+}
+```
+
+Key Differences from Q-Table:
+- Q-Table: Stores numerical values for each state-action pair (Q(s,a) = expected future reward).
+- Trajectory Memory: Stores natural language descriptions of situations and outcomes.
+- Q-Table: Updated via Bellman equation (Q(s,a) ← R + γ max Q(s',a')).
+- Trajectory Memory: Grows via selection (keep successes, keep novel failures).
+
+3. THE NEW LEARNING LOOP
+-------------------------
+
+Step 1: Visual Perception
+- Current frame is analyzed by VideoPerceptionLayer.
+- Outputs: agent_visible, goal_direction, danger_nearby, movement_detected.
+- This is converted to natural language: "Goal is down-right, Danger nearby".
+
+Step 2: Memory Retrieval
+- TrajectoryMemory searches for similar past situations.
+- Similarity metric: Keyword overlap (simple word matching).
+- Returns top-K most relevant experiences, prioritizing successes.
+
+Step 3: Agent Decision
+The agent receives:
+    - Current frame (visual input)
+    - Observation summary (inferred from vision)
+    - Relevant memories (past experiences)
+
+Agent logic (heuristic example):
+    - If past success memory exists for similar situation → Imitate that action.
+    - Else if danger nearby → Move toward goal direction.
+    - Else → Move toward goal direction.
+
+Future VLM integration:
+    - A Vision-Language Model would see the frame and read the memories.
+    - It would reason: "Last time I was here, moving RIGHT led to success."
+    - It would output an action based on visual understanding + memory context.
+
+Step 4: Outcome Inference
+After action execution, OutcomeInferenceModule analyzes the new frame:
+    - Agent on green tile? → Success
+    - Agent on red tile? → Failure
+    - Agent disappeared? → Failure (fell in hole)
+
+Step 5: Experience Storage
+If outcome is terminal:
+    - Success → ALWAYS store the experience.
+    - Failure → Store ONLY if it's a novel failure (new situation-action pair).
+    
+Why this works:
+    - Successes are always valuable (they show winning strategies).
+    - Repeated failures are redundant (we already know that path fails).
+    - Novel failures teach new dangers (avoid this situation-action in future).
+
+4. WHY THIS IS DIFFERENT FROM VLM
+----------------------------------
+
+| Aspect               | VLM                              | VLM2                           |
+|----------------------|----------------------------------|--------------------------------|
+| **Input Modality**   | Image + Text (multimodal prompt) | Image only                     |
+| **Reasoning Engine** | Vision-Language Model (Qwen-VL)  | Computer Vision + Heuristics   |
+| **Memory Type**      | Q-Table (state → action values)  | Trajectory (experiences)       |
+| **Learning Rule**    | Q-Learning (value updates)       | Selection (keep good, discard bad) |
+| **Output Parsing**   | XML parsing (`<action>RIGHT</action>`) | Direct action ID (integer) |
+
+5. WHY THIS ARCHITECTURE IS POWERFUL
+-------------------------------------
+
+(A) Modular and Extensible
+    - Each component (perception, action inference, outcome inference) is independent.
+    - Easy to swap heuristic agent with VLM agent.
+    - Easy to upgrade perception with deep learning (CNN-based feature extraction).
+
+(B) Grounded in Visual Reality
+    - No hallucination risk (agent only responds to what it sees).
+    - No symbolic state leakage (strict enforcement of video-only constraint).
+
+(C) Scalable Memory
+    - Trajectory memory grows with experience but prunes redundant failures.
+    - Top-K selection ensures memory stays bounded and informative.
+
+(D) Future VLM Integration Ready
+    - A Vision-Language Model can drop in as the agent function.
+    - It would receive frame + memories, reason visually, and output action.
+    - Learning would still be selection-based (no gradient updates on the VLM).
+
+6. THE PATH FORWARD
+-------------------
+
+Current State:
+    - Heuristic agent demonstrates the pipeline works.
+    - Memory system validates selection-based learning.
+
+Next Steps:
+    1. **Replace Heuristic with VLM**: Integrate Qwen-VL or GPT-4o as agent.
+    2. **Richer Perception**: Add frame embeddings, optical flow, object detection.
+    3. **Cross-Episode Learning**: Analyze patterns across multiple successful trajectories.
+    4. **Scale to Harder Environments**: Test on larger grids, stochastic dynamics.
+
+This is the VLM2 learning mechanism: Pure, visual, experiential, and scalable.
